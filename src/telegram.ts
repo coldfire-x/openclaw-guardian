@@ -3,6 +3,7 @@ import { URL } from "node:url";
 import { ProxyAgent } from "proxy-agent";
 import { ApprovalResult, FixDecision } from "./types.js";
 import { logger } from "./logger.js";
+import { StateStore } from "./state-store.js";
 
 const POLL_INTERVAL_MS = 2_000;
 const APPROVAL_TIMEOUT_MS = 10 * 60 * 1000;
@@ -56,7 +57,12 @@ export class TelegramApprovalBot {
   private stopping = false;
   private readonly pending = new Map<string, ApprovalRequest>();
 
-  constructor(enabled: boolean, botToken: string, proxy: string) {
+  constructor(
+    enabled: boolean,
+    botToken: string,
+    proxy: string,
+    private readonly stateStore: StateStore
+  ) {
     this.enabled = enabled;
     this.botToken = botToken;
     this.proxy = proxy.trim();
@@ -69,7 +75,7 @@ export class TelegramApprovalBot {
     }
   }
 
-  start(): void {
+  async start(): Promise<void> {
     if (!this.enabled) {
       logger.warn("Telegram approvals disabled. Fix actions will never run.");
       return;
@@ -77,6 +83,13 @@ export class TelegramApprovalBot {
 
     if (this.pollLoop) {
       return;
+    }
+
+    // Restore chat ID from persisted state
+    const state = await this.stateStore.load();
+    if (state.telegramChatId) {
+      this.approverChatId = state.telegramChatId;
+      logger.info(`Telegram bound to chat ID: ${this.approverChatId}`);
     }
 
     if (this.proxy) {
@@ -184,6 +197,10 @@ export class TelegramApprovalBot {
       const text = update.message.text.trim();
       if (text === "/start" || text === "/bind") {
         this.approverChatId = update.message.chat.id;
+        // Persist chat ID to state
+        const state = await this.stateStore.load();
+        state.telegramChatId = this.approverChatId;
+        await this.stateStore.save(state);
         await this.api("sendMessage", {
           chat_id: this.approverChatId,
           text: "openclaw-guardian is bound. You will receive fix approvals here."

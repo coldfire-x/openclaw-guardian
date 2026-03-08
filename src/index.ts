@@ -22,7 +22,7 @@ async function main(): Promise<void> {
   logger.info(`loaded config from ${configPath}`);
 
   const store = new StateStore();
-  const telegram = new TelegramApprovalBot(config.telegram.enabled, config.telegram.bot_token, config.telegram.proxy);
+  const telegram = new TelegramApprovalBot(config.telegram.enabled, config.telegram.bot_token, config.telegram.proxy, store);
   const guardian = new Guardian(config, store, telegram);
 
   await guardian.start();

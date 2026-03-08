@@ -77,6 +77,7 @@ export interface GuardianState {
   status: GuardianStatus;
   consecutiveMissingProcessCount: number;
   healthyStreak: number;
+  telegramChatId?: number;
   currentIncidentId?: string;
   lastIncidentStartedAt?: string;
   lastIncidentResolvedAt?: string;
