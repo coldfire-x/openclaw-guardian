@@ -6,6 +6,8 @@ import { logger } from "./logger.js";
 
 const POLL_INTERVAL_MS = 2_000;
 const APPROVAL_TIMEOUT_MS = 10 * 60 * 1000;
+const TELEGRAM_POLL_TIMEOUT_SEC = 25;
+const TELEGRAM_POLL_HTTP_TIMEOUT_MS = 35_000;
 
 interface ApprovalRequest {
   resolve: (value: ApprovalResult) => void;
@@ -50,7 +52,8 @@ export class TelegramApprovalBot {
   private readonly proxyAgent?: ProxyAgent;
   private lastUpdateId = 0;
   private approverChatId?: number;
-  private pollTimer?: NodeJS.Timeout;
+  private pollLoop?: Promise<void>;
+  private stopping = false;
   private readonly pending = new Map<string, ApprovalRequest>();
 
   constructor(enabled: boolean, botToken: string, proxy: string) {
@@ -72,23 +75,20 @@ export class TelegramApprovalBot {
       return;
     }
 
+    if (this.pollLoop) {
+      return;
+    }
+
     if (this.proxy) {
       logger.info(`Telegram proxy enabled (${this.safeProxyLabel(this.proxy)})`);
     }
 
-    this.pollTimer = setInterval(() => {
-      this.poll().catch((error) => {
-        logger.error(`Telegram poll error: ${error instanceof Error ? error.message : String(error)}`);
-      });
-    }, POLL_INTERVAL_MS);
-
-    void this.poll();
+    this.stopping = false;
+    this.pollLoop = this.runPollLoop();
   }
 
   stop(): void {
-    if (this.pollTimer) {
-      clearInterval(this.pollTimer);
-    }
+    this.stopping = true;
   }
 
   async notify(text: string): Promise<void> {
@@ -167,9 +167,9 @@ export class TelegramApprovalBot {
     }
 
     const response = await this.api("getUpdates", {
-      timeout: 0,
+      timeout: TELEGRAM_POLL_TIMEOUT_SEC,
       offset: this.lastUpdateId + 1
-    });
+    }, TELEGRAM_POLL_HTTP_TIMEOUT_MS);
 
     const updates = Array.isArray(response.result) ? (response.result as TelegramUpdate[]) : [];
 
@@ -226,9 +226,13 @@ export class TelegramApprovalBot {
     });
   }
 
-  private async api(method: string, payload: Record<string, unknown>): Promise<Record<string, unknown>> {
+  private async api(
+    method: string,
+    payload: Record<string, unknown>,
+    timeoutMs = 15_000
+  ): Promise<Record<string, unknown>> {
     const url = new URL(`${this.baseUrl}/${method}`);
-    const data = await this.postJson(url, payload, method);
+    const data = await this.postJson(url, payload, method, timeoutMs);
 
     if (!data.ok) {
       throw new Error(`telegram ${method} failed: ${data.description ?? "unknown error"}`);
@@ -240,7 +244,8 @@ export class TelegramApprovalBot {
   private async postJson(
     url: URL,
     payload: Record<string, unknown>,
-    methodName: string
+    methodName: string,
+    timeoutMs: number
   ): Promise<TelegramApiResponse> {
     const body = JSON.stringify(payload);
 
@@ -257,7 +262,7 @@ export class TelegramApprovalBot {
             "Content-Length": Buffer.byteLength(body).toString()
           },
           agent: this.proxyAgent,
-          timeout: 15_000
+          timeout: timeoutMs
         },
         (response) => {
           const chunks: Buffer[] = [];
@@ -299,6 +304,25 @@ export class TelegramApprovalBot {
       });
       request.write(body);
       request.end();
+    });
+  }
+
+  private async runPollLoop(): Promise<void> {
+    while (!this.stopping) {
+      try {
+        await this.poll();
+      } catch (error) {
+        logger.error(`Telegram poll error: ${error instanceof Error ? error.message : String(error)}`);
+        await this.delay(POLL_INTERVAL_MS);
+      }
+    }
+
+    this.pollLoop = undefined;
+  }
+
+  private async delay(ms: number): Promise<void> {
+    await new Promise((resolve) => {
+      setTimeout(resolve, ms);
     });
   }
 
