@@ -60,7 +60,9 @@ export class TelegramApprovalBot {
     this.baseUrl = `https://api.telegram.org/bot${botToken}`;
 
     if (this.proxy) {
-      this.proxyAgent = new ProxyAgent(this.proxy);
+      this.proxyAgent = new ProxyAgent({
+        getProxyForUrl: () => this.proxy
+      });
     }
   }
 
