@@ -15,7 +15,8 @@ const DEFAULT_CONFIG: GuardianConfig = {
   },
   telegram: {
     enabled: true,
-    bot_token: ""
+    bot_token: "",
+    proxy: ""
   },
   llm: {
     provider: "openai",
@@ -65,7 +66,8 @@ function mergeConfig(base: GuardianConfig, input: unknown): GuardianConfig {
   if (isObject(input.telegram)) {
     merged.telegram = {
       enabled: readBoolean(input.telegram.enabled, merged.telegram.enabled),
-      bot_token: readString(input.telegram.bot_token, merged.telegram.bot_token)
+      bot_token: readString(input.telegram.bot_token, merged.telegram.bot_token),
+      proxy: readString(input.telegram.proxy, merged.telegram.proxy)
     };
   }
 
@@ -102,6 +104,29 @@ function assertConfig(config: GuardianConfig): void {
 
   if (config.telegram.enabled && !config.telegram.bot_token.trim()) {
     throw new Error("telegram.bot_token is required when telegram.enabled=true");
+  }
+
+  if (config.telegram.proxy.trim()) {
+    const supportedProtocols = new Set([
+      "http:",
+      "https:",
+      "socks:",
+      "socks4:",
+      "socks4a:",
+      "socks5:",
+      "socks5h:"
+    ]);
+
+    let parsed: URL;
+    try {
+      parsed = new URL(config.telegram.proxy);
+    } catch {
+      throw new Error("telegram.proxy must be a valid proxy URL");
+    }
+
+    if (!supportedProtocols.has(parsed.protocol)) {
+      throw new Error("telegram.proxy must use http/https/socks proxy protocol");
+    }
   }
 
   if (!config.llm.provider.trim()) {

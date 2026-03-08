@@ -10,6 +10,7 @@ openclaw:
 telegram:
   enabled: true
   bot_token: "replace-with-telegram-bot-token"
+  proxy: "" # optional: http://127.0.0.1:7890 / https://... / socks5://...
 
 llm:
   provider: openai

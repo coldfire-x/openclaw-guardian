@@ -1,3 +1,6 @@
+import https from "node:https";
+import { URL } from "node:url";
+import { ProxyAgent } from "proxy-agent";
 import { ApprovalResult, FixDecision } from "./types.js";
 import { logger } from "./logger.js";
 
@@ -33,25 +36,42 @@ interface TelegramUpdate {
   callback_query?: TelegramCallbackQuery;
 }
 
+interface TelegramApiResponse {
+  ok: boolean;
+  result?: unknown;
+  description?: string;
+}
+
 export class TelegramApprovalBot {
   private readonly enabled: boolean;
   private readonly botToken: string;
+  private readonly proxy: string;
   private readonly baseUrl: string;
+  private readonly proxyAgent?: ProxyAgent;
   private lastUpdateId = 0;
   private approverChatId?: number;
   private pollTimer?: NodeJS.Timeout;
   private readonly pending = new Map<string, ApprovalRequest>();
 
-  constructor(enabled: boolean, botToken: string) {
+  constructor(enabled: boolean, botToken: string, proxy: string) {
     this.enabled = enabled;
     this.botToken = botToken;
+    this.proxy = proxy.trim();
     this.baseUrl = `https://api.telegram.org/bot${botToken}`;
+
+    if (this.proxy) {
+      this.proxyAgent = new ProxyAgent(this.proxy);
+    }
   }
 
   start(): void {
     if (!this.enabled) {
       logger.warn("Telegram approvals disabled. Fix actions will never run.");
       return;
+    }
+
+    if (this.proxy) {
+      logger.info(`Telegram proxy enabled (${this.safeProxyLabel(this.proxy)})`);
     }
 
     this.pollTimer = setInterval(() => {
@@ -149,7 +169,7 @@ export class TelegramApprovalBot {
       offset: this.lastUpdateId + 1
     });
 
-    const updates = (response.result ?? []) as TelegramUpdate[];
+    const updates = Array.isArray(response.result) ? (response.result as TelegramUpdate[]) : [];
 
     for (const update of updates) {
       this.lastUpdateId = Math.max(this.lastUpdateId, update.update_id);
@@ -205,29 +225,87 @@ export class TelegramApprovalBot {
   }
 
   private async api(method: string, payload: Record<string, unknown>): Promise<Record<string, unknown>> {
-    const response = await fetch(`${this.baseUrl}/${method}`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify(payload)
-    });
-
-    if (!response.ok) {
-      const body = await response.text();
-      throw new Error(`telegram ${method} failed: HTTP ${response.status} ${body}`);
-    }
-
-    const data = (await response.json()) as {
-      ok: boolean;
-      result?: Record<string, unknown> | Array<Record<string, unknown>>;
-      description?: string;
-    };
+    const url = new URL(`${this.baseUrl}/${method}`);
+    const data = await this.postJson(url, payload, method);
 
     if (!data.ok) {
       throw new Error(`telegram ${method} failed: ${data.description ?? "unknown error"}`);
     }
 
     return data as unknown as Record<string, unknown>;
+  }
+
+  private async postJson(
+    url: URL,
+    payload: Record<string, unknown>,
+    methodName: string
+  ): Promise<TelegramApiResponse> {
+    const body = JSON.stringify(payload);
+
+    return await new Promise<TelegramApiResponse>((resolve, reject) => {
+      const request = https.request(
+        {
+          protocol: url.protocol,
+          hostname: url.hostname,
+          port: url.port ? Number(url.port) : undefined,
+          path: `${url.pathname}${url.search}`,
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Content-Length": Buffer.byteLength(body).toString()
+          },
+          agent: this.proxyAgent,
+          timeout: 15_000
+        },
+        (response) => {
+          const chunks: Buffer[] = [];
+          response.on("data", (chunk: Buffer) => {
+            chunks.push(chunk);
+          });
+
+          response.on("end", () => {
+            const raw = Buffer.concat(chunks).toString("utf8");
+
+            if (!response.statusCode || response.statusCode < 200 || response.statusCode >= 300) {
+              reject(new Error(`telegram ${methodName} failed: HTTP ${response.statusCode ?? "unknown"} ${raw}`));
+              return;
+            }
+
+            let parsed: unknown;
+            try {
+              parsed = JSON.parse(raw);
+            } catch {
+              reject(new Error(`telegram ${methodName} failed: non-json response ${raw.slice(0, 400)}`));
+              return;
+            }
+
+            if (typeof parsed !== "object" || parsed === null || !("ok" in parsed)) {
+              reject(new Error(`telegram ${methodName} failed: malformed response`));
+              return;
+            }
+
+            resolve(parsed as TelegramApiResponse);
+          });
+        }
+      );
+
+      request.on("timeout", () => {
+        request.destroy(new Error(`telegram ${methodName} timeout`));
+      });
+      request.on("error", (error) => {
+        reject(error);
+      });
+      request.write(body);
+      request.end();
+    });
+  }
+
+  private safeProxyLabel(proxy: string): string {
+    try {
+      const parsed = new URL(proxy);
+      return `${parsed.protocol}//${parsed.hostname}${parsed.port ? `:${parsed.port}` : ""}`;
+    } catch {
+      return "invalid-proxy-url";
+    }
   }
 }

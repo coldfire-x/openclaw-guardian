@@ -50,6 +50,7 @@ openclaw:
 telegram:
   enabled: true
   bot_token: "replace-with-telegram-bot-token"
+  proxy: "" # optional: http://... / https://... / socks5://...
 
 llm:
   provider: openai
@@ -61,7 +62,8 @@ llm:
 ```
 
 Notes:
-- Telegram supports only `enabled` and `bot_token`.
+- Telegram supports `enabled`, `bot_token`, and optional `proxy`.
+- `telegram.proxy` supports `http://`, `https://`, `socks://`, `socks4://`, `socks4a://`, `socks5://`, `socks5h://`.
 - Send `/bind` to the bot once to bind your approval chat.
 - `llm.api_key` in config is the primary credential source.
 - `llm.api_key_env` is optional fallback if you prefer env-based secrets.

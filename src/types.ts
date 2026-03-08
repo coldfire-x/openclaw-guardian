@@ -11,6 +11,7 @@ export interface OpenClawConfig {
 export interface TelegramConfig {
   enabled: boolean;
   bot_token: string;
+  proxy: string;
 }
 
 export interface LlmConfig {
