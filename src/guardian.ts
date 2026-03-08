@@ -174,7 +174,7 @@ export class Guardian {
       what_happened: `Gateway process '${this.config.openclaw.process_name}' missing for ${this.state.consecutiveMissingProcessCount} consecutive checks (${this.config.openclaw.check_interval_sec}s interval).`,
       fix_procedure: [
         "Detect confirmed DOWN state after consecutive process-missing checks.",
-        "Run openclaw gateway doctor --format json.",
+        "Run openclaw doctor.",
         "Analyze diagnosis using built-in doc-first PI skill with live official docs.",
         "Request Telegram confirmation before any fix action."
       ],
@@ -242,7 +242,7 @@ export class Guardian {
 
       this.state.status = "FIXING";
       await this.saveState();
-      history.fix_procedure.push("Run openclaw gateway doctor --fix (user-approved).");
+      history.fix_procedure.push("Run openclaw doctor --fix (user-approved).");
 
       const fixReport = await runDoctorFix();
       history.evidence.fix_summary = fixReport.summary;

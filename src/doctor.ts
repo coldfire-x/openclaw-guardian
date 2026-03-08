@@ -1,13 +1,29 @@
 import { spawn } from "node:child_process";
 import { DoctorReport } from "./types.js";
 
-const DIAGNOSE_COMMAND = ["openclaw", "gateway", "doctor", "--format", "json"];
-const FIX_COMMAND = ["openclaw", "gateway", "doctor", "--fix"];
+const DIAGNOSE_COMMAND = ["openclaw", "doctor", "--yes"];
+const FIX_COMMAND = ["openclaw", "doctor", "--fix", "--non-interactive"];
 
 interface CommandResult {
   exitCode: number;
   stdout: string;
   stderr: string;
+}
+
+// Strip ANSI escape codes and box-drawing characters
+function cleanOutput(input: string): string {
+  return (
+    input
+      // ANSI escape codes
+      .replace(/\u001b\[[0-9;]*[a-zA-Z]/g, "")
+      // Box-drawing and block characters
+      .replace(/[\u2580-\u259F\u2500-\u257F]/gu, "")
+      // Clear other terminal UI artifacts
+      .replace(/\r/g, "")
+      // Collapse multiple empty lines
+      .replace(/\n{3,}/g, "\n\n")
+      .trim()
+  );
 }
 
 function runCommand(command: string[], timeoutMs: number): Promise<CommandResult> {
@@ -35,8 +51,8 @@ function runCommand(command: string[], timeoutMs: number): Promise<CommandResult
       clearTimeout(timeout);
       resolve({
         exitCode: 1,
-        stdout,
-        stderr: `${stderr}\n${error.message}`.trim()
+        stdout: cleanOutput(stdout),
+        stderr: cleanOutput(`${stderr}\n${error.message}`.trim())
       });
     });
 
@@ -44,8 +60,8 @@ function runCommand(command: string[], timeoutMs: number): Promise<CommandResult
       clearTimeout(timeout);
       resolve({
         exitCode: code ?? 1,
-        stdout,
-        stderr
+        stdout: cleanOutput(stdout),
+        stderr: cleanOutput(stderr)
       });
     });
   });

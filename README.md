@@ -11,7 +11,7 @@ flowchart LR
     B -- No --> D[Increment missing counter]
     D --> E{counter >= 3?}
     E -- No --> F[SUSPECTED_DOWN]
-    E -- Yes --> G[Run openclaw gateway doctor]
+    E -- Yes --> G[Run openclaw doctor]
     G --> H[PI decision with built-in doc skill]
     H --> I[Telegram approval request]
     I --> J{Approved?}
@@ -29,8 +29,8 @@ flowchart LR
 
 - `openclaw.port` default is `18789`.
 - Down condition is **no gateway process for 3 consecutive checks**.
-- `openclaw gateway doctor` always runs before any fix attempt.
-- `openclaw gateway doctor --fix` is never executed without explicit Telegram approval.
+- `openclaw doctor` always runs before any fix attempt.
+- `openclaw doctor --fix` is never executed without explicit Telegram approval.
 - Built-in skill `skills/openclaw-doc-first-fix/SKILL.md` is always used for PI guidance and is not configurable.
 
 ## Configuration

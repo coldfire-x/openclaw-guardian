@@ -9,7 +9,7 @@ Follow this sequence strictly:
 1. Fetch official documentation live from `https://docs.openclaw.ai/` and relevant subpages for the current diagnosis.
 2. Do not cache official docs to disk or across incidents; treat each diagnosis as a fresh docs read.
 3. Read local OpenClaw docs notes from `references/openclaw-docs/` as supplemental context only.
-4. Read `openclaw gateway doctor` output and recent log tail.
+4. Read `openclaw doctor` output and recent log tail.
 5. Map each recommended action to documentation evidence, prioritizing official `docs.openclaw.ai` references.
 6. Choose one decision: `safe_fix`, `manual_only`, or `unsafe`.
 7. Prefer `manual_only` when evidence is incomplete or ambiguous.

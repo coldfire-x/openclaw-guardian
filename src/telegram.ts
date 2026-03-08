@@ -1,9 +1,12 @@
 import https from "node:https";
 import { URL } from "node:url";
 import { ProxyAgent } from "proxy-agent";
-import { ApprovalResult, FixDecision } from "./types.js";
+import { ApprovalResult, FixDecision, GuardianConfig } from "./types.js";
 import { logger } from "./logger.js";
 import { StateStore } from "./state-store.js";
+import { restartGateway } from "./gateway.js";
+import { runDoctorDiagnose, runDoctorFix } from "./doctor.js";
+import { analyzeDoctorOutput } from "./doctor-analyzer.js";
 
 const POLL_INTERVAL_MS = 2_000;
 const APPROVAL_TIMEOUT_MS = 10 * 60 * 1000;
@@ -51,6 +54,8 @@ export class TelegramApprovalBot {
   private readonly proxy: string;
   private readonly baseUrl: string;
   private readonly proxyAgent?: ProxyAgent;
+  private readonly processName: string;
+  private readonly logPath: string;
   private lastUpdateId = 0;
   private approverChatId?: number;
   private pollLoop?: Promise<void>;
@@ -61,11 +66,16 @@ export class TelegramApprovalBot {
     enabled: boolean,
     botToken: string,
     proxy: string,
-    private readonly stateStore: StateStore
+    private readonly stateStore: StateStore,
+    processName: string,
+    logPath: string,
+    private readonly config: GuardianConfig
   ) {
     this.enabled = enabled;
     this.botToken = botToken;
     this.proxy = proxy.trim();
+    this.processName = processName;
+    this.logPath = logPath;
     this.baseUrl = `https://api.telegram.org/bot${botToken}`;
 
     if (this.proxy) {
@@ -109,6 +119,7 @@ export class TelegramApprovalBot {
       return;
     }
 
+    logger.info(`[TG] Sending notification: ${text.slice(0, 100)}${text.length > 100 ? "..." : ""}`);
     await this.api("sendMessage", {
       chat_id: this.approverChatId,
       text
@@ -139,9 +150,10 @@ export class TelegramApprovalBot {
       `Decision: ${decision.decision}`,
       `Reason: ${decision.reason}`,
       `Doctor: ${doctorSummary}`,
-      "Approve running: openclaw gateway doctor --fix ?"
+      "Approve running: openclaw doctor --fix ?"
     ].join("\n");
 
+    logger.info(`[TG] Requesting approval for incident ${incidentId} (decision: ${decision.decision})`);
     await this.api("sendMessage", {
       chat_id: this.approverChatId,
       text,
@@ -164,6 +176,7 @@ export class TelegramApprovalBot {
     return await new Promise<ApprovalResult>((resolve) => {
       const timeout = setTimeout(() => {
         this.pending.delete(incidentId);
+        logger.info(`[TG] Approval timeout for incident ${incidentId}`);
         resolve({
           approved: false,
           reason: "approval_timeout"
@@ -195,17 +208,103 @@ export class TelegramApprovalBot {
   private async handleUpdate(update: TelegramUpdate): Promise<void> {
     if (update.message?.text) {
       const text = update.message.text.trim();
+      const chatId = update.message.chat.id;
+
+      logger.info(`[TG] Received command: ${text} from chat ${chatId}`);
+
       if (text === "/start" || text === "/bind") {
-        this.approverChatId = update.message.chat.id;
+        this.approverChatId = chatId;
         // Persist chat ID to state
         const state = await this.stateStore.load();
         state.telegramChatId = this.approverChatId;
         await this.stateStore.save(state);
+        logger.info(`[TG] Bound to chat ID: ${chatId}`);
         await this.api("sendMessage", {
           chat_id: this.approverChatId,
-          text: "openclaw-guardian is bound. You will receive fix approvals here."
+          text: "openclaw-guardian is bound. You will receive fix approvals here.\n\nCommands:\n/restart-gateway - Restart the OpenClaw gateway\n/doctor - Run 'openclaw doctor'\n/doctor-fix - Run 'openclaw doctor --fix'"
         });
+        return;
       }
+
+      if (text === "/restart-gateway") {
+        if (!this.enabled) {
+          await this.api("sendMessage", {
+            chat_id: chatId,
+            text: "Telegram bot is disabled."
+          });
+          return;
+        }
+
+        logger.info("[TG] Executing /restart-gateway command");
+        await this.api("sendMessage", {
+          chat_id: chatId,
+          text: "Restarting OpenClaw gateway..."
+        });
+
+        const result = await restartGateway(this.processName, this.logPath);
+
+        const logSection = result.logLines ? `\n\nLast 10 log lines:\n\`\`\`\n${result.logLines}\n\`\`\`` : "";
+
+        await this.api("sendMessage", {
+          chat_id: chatId,
+          text: `Gateway restart result:\nPrevious state: ${result.previousState}\nSuccess: ${result.success}\nMessage: ${result.message}${logSection}`
+        });
+        logger.info(`[TG] /restart-gateway completed: success=${result.success}`);
+        return;
+      }
+
+      if (text === "/doctor") {
+        logger.info("[TG] Executing /doctor command");
+        await this.api("sendMessage", {
+          chat_id: chatId,
+          text: "Running 'openclaw doctor --yes' and analyzing with AI..."
+        });
+
+        const report = await runDoctorDiagnose();
+        logger.info(`[TG] Doctor completed, analyzing with LLM...`);
+
+        await this.api("sendMessage", {
+          chat_id: chatId,
+          text: "🤖 AI is analyzing the output and logs..."
+        });
+
+        const { formatted } = await analyzeDoctorOutput(this.config, report, this.logPath);
+
+        await this.api("sendMessage", {
+          chat_id: chatId,
+          text: formatted,
+          parse_mode: "Markdown"
+        });
+        logger.info(`[TG] /doctor completed: exitCode=${report.exitCode}`);
+        return;
+      }
+
+      if (text === "/doctor-fix") {
+        logger.info("[TG] Executing /doctor-fix command");
+        await this.api("sendMessage", {
+          chat_id: chatId,
+          text: "Running 'openclaw doctor --fix --non-interactive' and analyzing with AI..."
+        });
+
+        const report = await runDoctorFix();
+        logger.info(`[TG] Doctor fix completed, analyzing with LLM...`);
+
+        await this.api("sendMessage", {
+          chat_id: chatId,
+          text: "🤖 AI is analyzing the fix results and logs..."
+        });
+
+        const { formatted } = await analyzeDoctorOutput(this.config, report, this.logPath);
+
+        await this.api("sendMessage", {
+          chat_id: chatId,
+          text: formatted,
+          parse_mode: "Markdown"
+        });
+        logger.info(`[TG] /doctor-fix completed: exitCode=${report.exitCode}`);
+        return;
+      }
+
       return;
     }
 
@@ -219,8 +318,11 @@ export class TelegramApprovalBot {
       return;
     }
 
+    logger.info(`[TG] Received callback: ${action} for incident ${incidentId}`);
+
     const pending = this.pending.get(incidentId);
     if (!pending) {
+      logger.warn(`[TG] No pending approval for incident ${incidentId}`);
       await this.api("answerCallbackQuery", {
         callback_query_id: callback.id,
         text: "This approval is no longer active."
@@ -232,6 +334,8 @@ export class TelegramApprovalBot {
       approved: action === "approve",
       reason: action === "approve" ? "approved_by_user" : "rejected_by_user"
     };
+
+    logger.info(`[TG] Approval ${result.approved ? "granted" : "denied"} for incident ${incidentId}`);
 
     clearTimeout(pending.timeout);
     this.pending.delete(incidentId);
@@ -329,7 +433,7 @@ export class TelegramApprovalBot {
       try {
         await this.poll();
       } catch (error) {
-        logger.error(`Telegram poll error: ${error instanceof Error ? error.message : String(error)}`);
+        logger.error(`[TG] Poll error: ${error instanceof Error ? error.message : String(error)}`);
         await this.delay(POLL_INTERVAL_MS);
       }
     }
