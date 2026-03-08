@@ -35,10 +35,5 @@ if [ -f "$ENV_FILE" ]; then
   . "$ENV_FILE"
 fi
 
-if [ -z "${OPENCLAW_GUARDIAN_LLM_API_KEY:-}" ]; then
-  echo "OPENCLAW_GUARDIAN_LLM_API_KEY is empty. Set it in $ENV_FILE or environment." >&2
-  exit 1
-fi
-
 cd "$ROOT_DIR"
 exec node dist/index.js --config "$CONFIG_PATH"

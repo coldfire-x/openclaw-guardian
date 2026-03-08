@@ -14,6 +14,7 @@ telegram:
 llm:
   provider: openai
   api_url: https://api.openai.com/v1
+  api_key: "replace-with-llm-api-key"
   api_key_env: OPENCLAW_GUARDIAN_LLM_API_KEY
   model: gpt-4.1-mini
   timeout_sec: 30

@@ -104,15 +104,6 @@ prepare_files() {
   fi
 }
 
-ensure_background_env_ready() {
-  # shellcheck disable=SC1090
-  . "$ENV_FILE"
-  if [ -z "${OPENCLAW_GUARDIAN_LLM_API_KEY:-}" ]; then
-    echo "OPENCLAW_GUARDIAN_LLM_API_KEY is empty in $ENV_FILE. Set it before background mode." >&2
-    exit 1
-  fi
-}
-
 install_linux_service() {
   if ! command -v systemctl >/dev/null 2>&1; then
     echo "systemctl not found; cannot install background service mode on Linux." >&2
@@ -196,8 +187,6 @@ if [ "$MODE" = "foreground" ]; then
   exec "$RUNNER" --config "$CONFIG_PATH"
 fi
 
-ensure_background_env_ready
-
 OS_NAME=$(uname -s)
 case "$OS_NAME" in
   Linux) install_linux_service ;;
@@ -209,5 +198,5 @@ case "$OS_NAME" in
 esac
 
 echo "[openclaw-guardian] Background mode ready"
-echo "Set OPENCLAW_GUARDIAN_LLM_API_KEY in $ENV_FILE if empty."
+echo "Set llm.api_key in $CONFIG_PATH (or keep using $ENV_FILE for env fallback)."
 echo "Bind Telegram by sending /bind to your bot."

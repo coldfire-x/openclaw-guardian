@@ -54,6 +54,7 @@ telegram:
 llm:
   provider: openai
   api_url: https://api.openai.com/v1
+  api_key: "replace-with-llm-api-key"
   api_key_env: OPENCLAW_GUARDIAN_LLM_API_KEY
   model: gpt-4.1-mini
   timeout_sec: 30
@@ -62,6 +63,8 @@ llm:
 Notes:
 - Telegram supports only `enabled` and `bot_token`.
 - Send `/bind` to the bot once to bind your approval chat.
+- `llm.api_key` in config is the primary credential source.
+- `llm.api_key_env` is optional fallback if you prefer env-based secrets.
 - Installer creates runtime env files for service mode:
   - macOS/Linux: `.openclaw-guardian/guardian.env`
   - Windows: `.openclaw-guardian/guardian.env.ps1`
@@ -72,14 +75,12 @@ Notes:
 ### macOS / Linux
 
 ```bash
-export OPENCLAW_GUARDIAN_LLM_API_KEY=your_key
 ./scripts/install.sh --mode foreground --config config/config.yaml
 ```
 
 ### Windows (PowerShell)
 
 ```powershell
-$env:OPENCLAW_GUARDIAN_LLM_API_KEY="your_key"
 ./scripts/install.ps1 -Mode foreground -ConfigPath config/config.yaml
 ```
 
@@ -90,7 +91,6 @@ Foreground mode installs/builds and then runs `openclaw-guardian` in the current
 ### Linux (systemd user service)
 
 ```bash
-export OPENCLAW_GUARDIAN_LLM_API_KEY=your_key
 ./scripts/install.sh --mode background --config config/config.yaml
 systemctl --user status openclaw-guardian.service
 ```
@@ -98,7 +98,6 @@ systemctl --user status openclaw-guardian.service
 ### macOS (launchd agent)
 
 ```bash
-export OPENCLAW_GUARDIAN_LLM_API_KEY=your_key
 ./scripts/install.sh --mode background --config config/config.yaml
 launchctl print gui/$(id -u)/com.openclaw.guardian
 ```
@@ -106,12 +105,9 @@ launchctl print gui/$(id -u)/com.openclaw.guardian
 ### Windows (Scheduled Task service mode)
 
 ```powershell
-$env:OPENCLAW_GUARDIAN_LLM_API_KEY="your_key"
 ./scripts/install.ps1 -Mode background -ConfigPath config/config.yaml
 schtasks /Query /TN OpenClawGuardian /V /FO LIST
 ```
-
-Background mode requires `OPENCLAW_GUARDIAN_LLM_API_KEY` to be set in your shell or in the generated runtime env file.
 
 ## Service control
 

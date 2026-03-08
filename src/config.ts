@@ -20,6 +20,7 @@ const DEFAULT_CONFIG: GuardianConfig = {
   llm: {
     provider: "openai",
     api_url: "https://api.openai.com/v1",
+    api_key: "",
     api_key_env: "OPENCLAW_GUARDIAN_LLM_API_KEY",
     model: "gpt-4.1-mini",
     timeout_sec: 30
@@ -72,6 +73,7 @@ function mergeConfig(base: GuardianConfig, input: unknown): GuardianConfig {
     merged.llm = {
       provider: readString(input.llm.provider, merged.llm.provider),
       api_url: readString(input.llm.api_url, merged.llm.api_url),
+      api_key: readString(input.llm.api_key, merged.llm.api_key),
       api_key_env: readString(input.llm.api_key_env, merged.llm.api_key_env),
       model: readString(input.llm.model, merged.llm.model),
       timeout_sec: readNumber(input.llm.timeout_sec, merged.llm.timeout_sec)
@@ -108,10 +110,6 @@ function assertConfig(config: GuardianConfig): void {
 
   if (!config.llm.model.trim()) {
     throw new Error("llm.model is required");
-  }
-
-  if (!config.llm.api_key_env.trim()) {
-    throw new Error("llm.api_key_env is required");
   }
 }
 

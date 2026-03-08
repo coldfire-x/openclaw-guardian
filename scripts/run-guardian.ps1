@@ -16,9 +16,5 @@ if (Test-Path $EnvScript) {
   . $EnvScript
 }
 
-if ([string]::IsNullOrWhiteSpace($env:OPENCLAW_GUARDIAN_LLM_API_KEY)) {
-  throw "OPENCLAW_GUARDIAN_LLM_API_KEY is empty. Set it in $EnvScript or environment."
-}
-
 Set-Location $RootDir
 node dist/index.js --config $ConfigPath

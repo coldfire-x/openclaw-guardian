@@ -247,11 +247,17 @@ function modelPrompt(report: DoctorReport, snapshot: ProbeSnapshot): string {
 }
 
 export async function decideFixAction(config: GuardianConfig, report: DoctorReport, snapshot: ProbeSnapshot): Promise<FixDecision> {
-  const apiKey = process.env[config.llm.api_key_env];
+  const configuredApiKey = config.llm.api_key.trim();
+  const envApiKey = config.llm.api_key_env.trim() ? (process.env[config.llm.api_key_env] ?? "").trim() : "";
+  const apiKey = configuredApiKey || envApiKey;
+
   if (!apiKey) {
+    const envHint = config.llm.api_key_env.trim()
+      ? ` or set env var ${config.llm.api_key_env}`
+      : "";
     return {
       decision: "manual_only",
-      reason: `missing LLM API key env var: ${config.llm.api_key_env}`,
+      reason: `missing LLM API key: set llm.api_key in config${envHint}`,
       confidence: 0,
       recommended_actions: ["Set API key and retry diagnosis"],
       doc_references: []

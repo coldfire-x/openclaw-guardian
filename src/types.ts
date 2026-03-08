@@ -16,6 +16,7 @@ export interface TelegramConfig {
 export interface LlmConfig {
   provider: string;
   api_url: string;
+  api_key: string;
   api_key_env: string;
   model: string;
   timeout_sec: number;

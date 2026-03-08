@@ -71,16 +71,11 @@ if ($Mode -eq "foreground") {
   exit $LASTEXITCODE
 }
 
-. $EnvScript
-if ([string]::IsNullOrWhiteSpace($env:OPENCLAW_GUARDIAN_LLM_API_KEY)) {
-  throw "OPENCLAW_GUARDIAN_LLM_API_KEY is empty in $EnvScript. Set it before background mode."
-}
-
 $runCommand = "powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$Runner`" -ConfigPath `"$ConfigPath`""
 & schtasks.exe /Create /TN $TaskName /SC ONLOGON /TR $runCommand /F | Out-Null
 & schtasks.exe /Run /TN $TaskName | Out-Null
 
 Write-Host "[openclaw-guardian] Background task installed and started"
 Write-Host "Check status: schtasks /Query /TN $TaskName /V /FO LIST"
-Write-Host "Set OPENCLAW_GUARDIAN_LLM_API_KEY in $EnvScript if empty."
+Write-Host "Set llm.api_key in $ConfigPath (or keep using $EnvScript for env fallback)."
 Write-Host "Bind Telegram by sending /bind to your bot."
