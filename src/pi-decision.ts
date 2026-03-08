@@ -294,22 +294,9 @@ export async function decideFixAction(config: GuardianConfig, report: DoctorRepo
     getApiKey: () => apiKey
   });
 
-  let textStream = "";
-
-  agent.on("message_update", (event: unknown) => {
-    if (typeof event !== "object" || event === null) {
-      return;
-    }
-
-    const typed = event as { type?: string; textDelta?: string };
-    if (typed.type === "text_delta" && typeof typed.textDelta === "string") {
-      textStream += typed.textDelta;
-    }
-  });
-
   await agent.prompt(modelPrompt(report, snapshot));
 
-  const raw = textStream.trim() || extractAssistantText(agent.state);
+  const raw = extractAssistantText(agent.state);
   const decoded = extractJson(raw);
 
   if (!decoded) {
