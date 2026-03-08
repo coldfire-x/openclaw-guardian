@@ -7,8 +7,9 @@ param(
 $ErrorActionPreference = "Stop"
 
 $RootDir = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
-$StateDir = Join-Path $RootDir ".openclaw-guardian"
-$EnvScript = Join-Path $StateDir "guardian.env.ps1"
+$HomeStateDir = Join-Path $env:USERPROFILE ".openclaw-guardian"
+$EnvScript = Join-Path $HomeStateDir "guardian.env.ps1"
+$LogPath = Join-Path $RootDir "service.log"
 $ExampleConfig = Join-Path $RootDir "config/config.example.yaml"
 $DefaultConfig = Join-Path $RootDir "config/config.yaml"
 $Runner = Join-Path $RootDir "scripts/run-guardian.ps1"
@@ -43,10 +44,9 @@ if (-not (Test-Path $ConfigPath)) {
   throw "Config file not found: $ConfigPath"
 }
 
-New-Item -ItemType Directory -Path $StateDir -Force | Out-Null
-$logPath = Join-Path $StateDir "service.log"
-if (-not (Test-Path $logPath)) {
-  New-Item -ItemType File -Path $logPath -Force | Out-Null
+New-Item -ItemType Directory -Path $HomeStateDir -Force | Out-Null
+if (-not (Test-Path $LogPath)) {
+  New-Item -ItemType File -Path $LogPath -Force | Out-Null
 }
 
 if (-not (Test-Path $EnvScript)) {

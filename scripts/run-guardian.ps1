@@ -5,8 +5,8 @@ param(
 $ErrorActionPreference = "Stop"
 
 $RootDir = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
-$StateDir = Join-Path $RootDir ".openclaw-guardian"
-$EnvScript = Join-Path $StateDir "guardian.env.ps1"
+$HomeStateDir = Join-Path $env:USERPROFILE ".openclaw-guardian"
+$EnvScript = Join-Path $HomeStateDir "guardian.env.ps1"
 
 if (-not [System.IO.Path]::IsPathRooted($ConfigPath)) {
   $ConfigPath = Join-Path $RootDir $ConfigPath

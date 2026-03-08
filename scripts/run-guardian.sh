@@ -2,8 +2,8 @@
 set -eu
 
 ROOT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
-STATE_DIR="$ROOT_DIR/.openclaw-guardian"
-ENV_FILE="$STATE_DIR/guardian.env"
+HOME_STATE_DIR="${HOME}/.openclaw-guardian"
+ENV_FILE="$HOME_STATE_DIR/guardian.env"
 CONFIG_PATH="$ROOT_DIR/config/config.yaml"
 
 while [ $# -gt 0 ]; do

@@ -5,8 +5,8 @@ import { getModel } from "@mariozechner/pi-ai";
 import { DoctorReport, FixDecision, GuardianConfig, ProbeSnapshot } from "./types.js";
 import { loadRecentFixHistory } from "./history.js";
 
-const BUILTIN_SKILL_PATH = path.resolve(process.cwd(), "skills/openclaw-doc-first-fix/SKILL.md");
-const DOCS_DIR = path.resolve(process.cwd(), "references/openclaw-docs");
+const BUILTIN_SKILL_PATH = path.resolve(import.meta.dirname ?? __dirname, "../skills/openclaw-doc-first-fix/SKILL.md");
+const DOCS_DIR = path.resolve(import.meta.dirname ?? __dirname, "../references/openclaw-docs");
 const DOC_FILES = ["README.md", "gateway-doctor.md", "gateway-recovery.md"];
 const OFFICIAL_DOC_URLS = [
   "https://docs.openclaw.ai/",

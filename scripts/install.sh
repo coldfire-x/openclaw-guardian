@@ -52,9 +52,9 @@ fi
 
 ROOT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 CONFIG_DIR="$ROOT_DIR/config"
-STATE_DIR="$ROOT_DIR/.openclaw-guardian"
-ENV_FILE="$STATE_DIR/guardian.env"
-LOG_FILE="$STATE_DIR/service.log"
+HOME_STATE_DIR="${HOME}/.openclaw-guardian"
+ENV_FILE="$HOME_STATE_DIR/guardian.env"
+LOG_FILE="$ROOT_DIR/service.log"
 RUNNER="$ROOT_DIR/scripts/run-guardian.sh"
 USER_ID=$(id -u)
 
@@ -87,7 +87,7 @@ prepare_files() {
     exit 1
   fi
 
-  mkdir -p "$STATE_DIR"
+  mkdir -p "$HOME_STATE_DIR"
   : > "$LOG_FILE"
 
   if [ ! -f "$ENV_FILE" ]; then

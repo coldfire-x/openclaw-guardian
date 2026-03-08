@@ -1,8 +1,9 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { GuardianState } from "./types.js";
+import { getStateDir } from "./paths.js";
 
-const STATE_DIR = path.resolve(process.cwd(), ".openclaw-guardian");
+const STATE_DIR = getStateDir();
 const STATE_PATH = path.join(STATE_DIR, "state.json");
 
 const DEFAULT_STATE: GuardianState = {

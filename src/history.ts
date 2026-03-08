@@ -1,8 +1,9 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { FixHistoryRecord } from "./types.js";
+import { getStateDir } from "./paths.js";
 
-const STATE_DIR = path.resolve(process.cwd(), ".openclaw-guardian");
+const STATE_DIR = getStateDir();
 const HISTORY_JSONL_PATH = path.join(STATE_DIR, "fix-history.jsonl");
 
 function markdownEscape(input: string): string {

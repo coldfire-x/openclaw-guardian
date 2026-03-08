@@ -68,8 +68,8 @@ Notes:
 - `llm.api_key` in config is the primary credential source.
 - `llm.api_key_env` is optional fallback if you prefer env-based secrets.
 - Installer creates runtime env files for service mode:
-  - macOS/Linux: `.openclaw-guardian/guardian.env`
-  - Windows: `.openclaw-guardian/guardian.env.ps1`
+  - macOS/Linux: `~/.openclaw-guardian/guardian.env`
+  - Windows: `%USERPROFILE%\.openclaw-guardian\guardian.env.ps1`
 - Official docs are fetched live from `https://docs.openclaw.ai/` on each diagnosis and are not cached.
 
 ## Quick install
@@ -118,7 +118,7 @@ schtasks /Query /TN OpenClawGuardian /V /FO LIST
 ```bash
 systemctl --user restart openclaw-guardian.service
 systemctl --user stop openclaw-guardian.service
-tail -f .openclaw-guardian/service.log
+tail -f service.log
 ```
 
 ### macOS
@@ -126,7 +126,7 @@ tail -f .openclaw-guardian/service.log
 ```bash
 launchctl kickstart -k gui/$(id -u)/com.openclaw.guardian
 launchctl bootout gui/$(id -u)/com.openclaw.guardian
-tail -f .openclaw-guardian/service.log
+tail -f service.log
 ```
 
 ### Windows
@@ -134,7 +134,7 @@ tail -f .openclaw-guardian/service.log
 ```powershell
 schtasks /Run /TN OpenClawGuardian
 schtasks /End /TN OpenClawGuardian
-Get-Content .openclaw-guardian/service.log -Wait
+Get-Content service.log -Wait
 ```
 
 ## Local docs snapshot
@@ -151,8 +151,10 @@ It also fetches live official docs from `https://docs.openclaw.ai/` for each dia
 
 Every incident writes structured history for later reference to:
 
-- `.openclaw-guardian/fix-history.jsonl`
-- `.openclaw-guardian/fix-history.md`
+- `~/.openclaw-guardian/fix-history.jsonl` (macOS/Linux)
+- `%USERPROFILE%\.openclaw-guardian\fix-history.jsonl` (Windows)
+- `~/.openclaw-guardian/fix-history.md` (macOS/Linux)
+- `%USERPROFILE%\.openclaw-guardian\fix-history.md` (Windows)
 
 Each record includes:
 - when (`when_started_iso`, `when_ended_iso`)

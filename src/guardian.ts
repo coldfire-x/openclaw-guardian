@@ -39,6 +39,23 @@ export class Guardian {
     private readonly telegram: TelegramApprovalBot
   ) {}
 
+  private async saveState(): Promise<void> {
+    // Reload current state from disk to preserve fields managed by other components (e.g., telegramChatId)
+    const current = await this.stateStore.load();
+    // Merge our managed fields into the current state
+    const merged: GuardianState = {
+      ...current,
+      status: this.state.status,
+      consecutiveMissingProcessCount: this.state.consecutiveMissingProcessCount,
+      healthyStreak: this.state.healthyStreak,
+      currentIncidentId: this.state.currentIncidentId,
+      lastIncidentStartedAt: this.state.lastIncidentStartedAt,
+      lastIncidentResolvedAt: this.state.lastIncidentResolvedAt,
+      lastError: this.state.lastError
+    };
+    await this.stateStore.save(merged);
+  }
+
   async start(): Promise<void> {
     this.state = await this.stateStore.load();
     this.telegram.start();
@@ -107,7 +124,7 @@ export class Guardian {
       this.state.lastIncidentResolvedAt = new Date().toISOString();
     }
 
-    await this.stateStore.save(this.state);
+    await this.saveState();
   }
 
   private async onProcessMissing(snapshot: ProbeSnapshot): Promise<void> {
@@ -115,7 +132,7 @@ export class Guardian {
 
     if (this.state.consecutiveMissingProcessCount < this.config.openclaw.down_threshold) {
       this.state.status = "SUSPECTED_DOWN";
-      await this.stateStore.save(this.state);
+      await this.saveState();
       logger.warn(
         `gateway process missing (${this.state.consecutiveMissingProcessCount}/${this.config.openclaw.down_threshold})`
       );
@@ -123,7 +140,7 @@ export class Guardian {
     }
 
     this.state.status = "CONFIRMED_DOWN";
-    await this.stateStore.save(this.state);
+    await this.saveState();
 
     if (this.state.currentIncidentId) {
       logger.warn(`incident ${this.state.currentIncidentId} still active; waiting`);
@@ -183,7 +200,7 @@ export class Guardian {
       this.state.currentIncidentId = incidentId;
       this.state.lastIncidentStartedAt = startedAtIso;
       this.state.status = "DIAGNOSING";
-      await this.stateStore.save(this.state);
+      await this.saveState();
 
       await this.telegram.notify(`OpenClaw gateway is confirmed down. Incident: ${incidentId}`);
 
@@ -197,7 +214,7 @@ export class Guardian {
       history.fix_procedure.push(`Decision output: ${decision.decision}`);
 
       this.state.status = "AWAITING_CONFIRMATION";
-      await this.stateStore.save(this.state);
+      await this.saveState();
 
       const approval = await this.telegram.requestApproval(incidentId, decision, doctorReport.summary);
       history.evidence.approval = approval.reason;
@@ -207,7 +224,7 @@ export class Guardian {
         this.state.status = "ESCALATED";
         this.state.lastError = `approval denied: ${approval.reason}`;
         this.state.currentIncidentId = undefined;
-        await this.stateStore.save(this.state);
+        await this.saveState();
         await finalizeHistory("escalated_approval_denied");
         logger.warn(`incident ${incidentId} not approved: ${approval.reason}`);
         return;
@@ -217,14 +234,14 @@ export class Guardian {
         this.state.status = "ESCALATED";
         this.state.lastError = `decision denied fix: ${decision.decision}`;
         this.state.currentIncidentId = undefined;
-        await this.stateStore.save(this.state);
+        await this.saveState();
         await this.telegram.notify(`Incident ${incidentId}: approval received but decision=${decision.decision}; no fix executed.`);
         await finalizeHistory(`escalated_decision_${decision.decision}`);
         return;
       }
 
       this.state.status = "FIXING";
-      await this.stateStore.save(this.state);
+      await this.saveState();
       history.fix_procedure.push("Run openclaw gateway doctor --fix (user-approved).");
 
       const fixReport = await runDoctorFix();
@@ -236,7 +253,7 @@ export class Guardian {
         this.state.status = "ESCALATED";
         this.state.lastError = `doctor --fix failed: ${fixReport.summary}`;
         this.state.currentIncidentId = undefined;
-        await this.stateStore.save(this.state);
+        await this.saveState();
         await this.telegram.notify(`Incident ${incidentId}: doctor --fix failed. ${fixReport.summary}`);
         await finalizeHistory("escalated_fix_command_failed");
         return;
@@ -244,7 +261,7 @@ export class Guardian {
 
       this.state.status = "VERIFYING";
       this.state.healthyStreak = 0;
-      await this.stateStore.save(this.state);
+      await this.saveState();
       await this.telegram.notify(`Incident ${incidentId}: fix executed. Verifying health now.`);
       history.fix_procedure.push("Verify gateway health after fix.");
 
@@ -253,7 +270,7 @@ export class Guardian {
         this.state.status = "ESCALATED";
         this.state.lastError = "verification failed after fix";
         this.state.currentIncidentId = undefined;
-        await this.stateStore.save(this.state);
+        await this.saveState();
         await this.telegram.notify(`Incident ${incidentId}: verification failed. Manual intervention required.`);
         await finalizeHistory("escalated_verification_failed");
         return;
@@ -262,7 +279,7 @@ export class Guardian {
       this.state.status = "HEALTHY";
       this.state.currentIncidentId = undefined;
       this.state.lastIncidentResolvedAt = new Date().toISOString();
-      await this.stateStore.save(this.state);
+      await this.saveState();
       await this.telegram.notify(`Incident ${incidentId}: gateway recovered successfully.`);
       await finalizeHistory("resolved_recovered_after_fix");
     } catch (error) {
